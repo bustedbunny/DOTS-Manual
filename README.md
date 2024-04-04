@@ -1,5 +1,10 @@
 # DOTS-Manual
 
+## Table of contents
+
+- [System dependencies](#system-dependencies)
+- [Sync points](#sync-points)
+
 ## System dependencies
 
 Job dependencies are fully handled by Unity.Entities code when it comes to cross system relationships.
@@ -62,7 +67,6 @@ meaning they will run in parallel to each other.
 *This is a very simple explanation on how it works. In actual implementation it has separation on
 `ReadOnly` and `ReadWrite`which makes things more complicated,
 but allows more jobs to in parallel to each other.*
-
 
 ## Sync points
 

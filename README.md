@@ -1,5 +1,69 @@
 # DOTS-Manual
 
+## System dependencies
+
+Job dependencies are fully handled by Unity.Entities code when it comes to cross system relationships.
+For example: scheduling job that writes to `LocalTransform` in System A will always ensure that scheduling job
+that reads/writes `LocalTransform` in System B, will always wait for each other. At the same time, if both
+jobs are only reading some component - then they can run in parallel.
+
+### How it works
+
+During system lifetime, system keeps lists of registered Read (RO) and Write (RW)component types for this system.
+Generally those are gathered in `OnCreate`, but sometimes (which is usually a mistake) it may happen even in
+`OnUpdate`.
+The example of logic, that causes gathering such components:
+
+* `EntityQuery` creation
+* `SystemState.GetComponentTypeHandle` or `SystemAPI.GetComponentTypeHandle`
+* `SystemState.GetComponentLookup` or `SystemAPI.GetComponentLookup` (as well as buffer lookups)
+
+*Some information may be not 100% correct, but the general concept is.*
+
+Each `Unity.Entities.World` contains a dependency registry for each component type. By default each
+component dependency is `default(JobHandle)`.
+Before any system updates, it has `BeforeUpdate` call, which gets `JobHandle` for each component type out of
+this registry and combines them all into one `JobHandle`, which then gets assigned to `SystemState.Dependency`.
+
+Then during `OnUpdate` user code will schedule jobs, using `SystemState.Dependency` as input dependency, which
+makes all jobs scheduled by system depend on all those dependencies. At the same time all jobs scheduled by
+system (at least in all normal cases) return `JobHandle` which then gets assigned to same `SystemState.Dependency`.
+
+After system `OnUpdate` there is another `AfterUpdate` call, which assigns final `SystemState.Dependency` back
+to component dependency registry. So after system is done, all `JobHandle` for specific component types, contain
+the dependency on all jobs, that system scheduled.
+
+So let's make an example of what happens to properly understand what is going on:
+
+Let's say we have `System X` which reads component `A` and `B`. And then we also have `System Y`
+which writes to `B` and updates after `System X`.
+
+Before `System X` runs, component dependency registry looks like:
+
+* A - `default(JobHandle)`
+* B - `default(JobHandle)`
+
+So right before `System X`'s `OnUpdate` is called, it's `SystemState.Dependency` will result in same
+`default(JobHandle)`.
+
+After `System X` runs, it writes back it's `SystemState.Dependency` so component dependency registry looks like:
+
+* A - `System X dependency`
+* B - `System X dependency`
+
+Right before `System Y` runs, it obtains only component `B` dependency and assigns it to it's `SystemState.Dependency`.
+So now, any job scheduled by `System Y` will implicitly depend on jobs scheduled by `System X` and avoid
+race conditions.
+
+If we add another `System Z`, that updates after `System Y`, and depends only on example component `C`.
+Then in this current world, all jobs scheduled by `System Z` will not depend on neither `System X` or `System Y`,
+meaning they will run in parallel to each other.
+
+*This is a very simple explanation on how it works. In actual implementation it has separation on
+`ReadOnly` and `ReadWrite`which makes things more complicated,
+but allows more jobs to in parallel to each other.*
+
+
 ## Sync points
 
 ### What is the sync point?
@@ -27,7 +91,7 @@ public void Complete()
 }
 ```
 
-So basically, main thread just wait for jobs to finish. 
+So basically, main thread just wait for jobs to finish.
 
 *Technically, main thread also starts to participate in finishing those jobs, but it's not always possible.*
 
@@ -36,11 +100,11 @@ So basically, main thread just wait for jobs to finish.
 Assuming you have multiple sync points in your project, here's what's going to happen:
 
 1. Main thread schedules job A.
-2. Next system, makes a sync point and main thread waits for job A to finish. 
+2. Next system, makes a sync point and main thread waits for job A to finish.
 3. Main thread schedules job B.
 4. Next system, makes another sync point and main thread wait for job B to finish.
 
-You may guess that so far, main thread had spent all it's time waiting for jobs to finish, so it's as good as 
+You may guess that so far, main thread had spent all it's time waiting for jobs to finish, so it's as good as
 singlethreaded application.
 
 What would be much better:
@@ -49,23 +113,26 @@ What would be much better:
 2. Main thread schedules job B, C, D...
 3. After all jobs in project are scheduled - some system makes a sync point.
 
-What makes it different from first example is that jobs are already being executed, while main thread schedules next jobs.
+What makes it different from first example is that jobs are already being executed, while main thread schedules next
+jobs.
 Then, by the time sync point happens - all jobs are already scheduled and worker threads can be efficiently utilized.
-
 
 ### How sync points happen?
 
 There are many places where sync points are placed for safety reasons. Here's several examples:
+
 1. `EntityManager.GetComponentData` - this method reads data that is potentially being written to in a job, that's why
-it needs to sync all jobs that write to that component (but not jobs that only read it).
-2. `EntityManager.SetComponentData` - this method writes data that is potentially read/written by a job, so all jobs that
-either read or write to that component must be synced.
+   it needs to sync all jobs that write to that component (but not jobs that only read it).
+2. `EntityManager.SetComponentData` - this method writes data that is potentially read/written by a job, so all jobs
+   that
+   either read or write to that component must be synced.
 3. `EntityManager.AddComponent`, `EntityManager.CreateEntity`, `EntityManager.DestroyEntity` - and any other method
-that causes structural changes can modify chunks that are used by jobs, that's why they will cause sync point on 
-every job scheduled in this world.
+   that causes structural changes can modify chunks that are used by jobs, that's why they will cause sync point on
+   every job scheduled in this world.
 4. `EntityCommandBuffer.Playback` - any ecb playback will cause a sync point, since all operations that it does are
-executed on main thread. So that means, simply using `EndSimulationEntityCommandBufferSystem` will cause you a sync point
-during that system's update.
+   executed on main thread. So that means, simply using `EndSimulationEntityCommandBufferSystem` will cause you a sync
+   point
+   during that system's update.
 
 There are many more places where sync points happen and it's best to look at source of method to see if it has one.
 But as general rule of thumb - any direct ECS data access on main thread = sync point.

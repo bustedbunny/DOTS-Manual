@@ -99,6 +99,28 @@ So basically, main thread just wait for jobs to finish.
 
 *Technically, main thread also starts to participate in finishing those jobs, but it's not always possible.*
 
+### Types of sync points
+
+There are multiple types of sync points and each behaves differently.
+
+* ReadOnly sync point - completes only jobs that have `ReadWrite` type dependency
+* ReadWrite sync point - completes only jobs that have type dependency
+* Structural Change sync point - completes all jobs scheduled from `Unity.Entities.World`
+
+Let's go over some examples:
+let's say we have `JobA` that reads from `LocalTransform`, `JobB` which writes to `LocalTransform` and `JobC` which
+reads from `PhysicsVelocity` scheduled by some systems.
+
+If later in the frame system will call `EntityManager.GetComponentData<LocalTransform>` - this is going to cause
+`ReadOnly` sync point and it will force complete `JobA`.
+
+If system will call `EntityManager.SetComponentData<LocalTransform>` it will complete both `JobA` and `JobB` since
+both are accessing `LocalTransform`.
+
+If system will call `EntityManager.AddComponent/RemoveComponent/Instantiate/CreateEntity` - this will cause
+structural change sync point, and it will complete all jobs: `JobA`, `JobB` and `JobC` regardless of what components
+they access.
+
 ### Why sync points should be avoided?
 
 Assuming you have multiple sync points in your project, here's what's going to happen:
@@ -109,7 +131,7 @@ Assuming you have multiple sync points in your project, here's what's going to h
 4. Next system, makes another sync point and main thread wait for job B to finish.
 
 You may guess that so far, main thread had spent all it's time waiting for jobs to finish, so it's as good as
-singlethreaded application.
+single-threaded application.
 
 What would be much better:
 
@@ -130,13 +152,12 @@ There are many places where sync points are placed for safety reasons. Here's se
 2. `EntityManager.SetComponentData` - this method writes data that is potentially read/written by a job, so all jobs
    that
    either read or write to that component must be synced.
-3. `EntityManager.AddComponent`, `EntityManager.CreateEntity`, `EntityManager.DestroyEntity` - and any other method
+3. `EntityManager.AddComponent/RemoveComponent/Instantiate/CreateEntity` - and any other method
    that causes structural changes can modify chunks that are used by jobs, that's why they will cause sync point on
    every job scheduled in this world.
 4. `EntityCommandBuffer.Playback` - any ecb playback will cause a sync point, since all operations that it does are
    executed on main thread. So that means, simply using `EndSimulationEntityCommandBufferSystem` will cause you a sync
-   point
-   during that system's update.
+   point during that system's update.
 
 There are many more places where sync points happen and it's best to look at source of method to see if it has one.
 But as general rule of thumb - any direct ECS data access on main thread = sync point.

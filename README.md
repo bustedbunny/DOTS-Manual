@@ -147,17 +147,28 @@ Then, by the time sync point happens - all jobs are already scheduled and worker
 
 There are many places where sync points are placed for safety reasons. Here's several examples:
 
-1. `EntityManager.GetComponentData` - this method reads data that is potentially being written to in a job, that's why
-   it needs to sync all jobs that write to that component (but not jobs that only read it).
-2. `EntityManager.SetComponentData` - this method writes data that is potentially read/written by a job, so all jobs
-   that
-   either read or write to that component must be synced.
+1. `EntityManager.GetComponentData/SystemAPI.GetComponent` - this method reads data that is potentially
+   being written to in a job, that's why it needs to sync all jobs that write to that component
+   (but not jobs that only read it).
+2. `EntityManager.SetComponentData/SystemAPI.SetComponent` - this method writes data that is potentially
+   read/written by a job, so all jobs that either read or write to that component must be synced.
 3. `EntityManager.AddComponent/RemoveComponent/Instantiate/CreateEntity` - and any other method
    that causes structural changes can modify chunks that are used by jobs, that's why they will cause sync point on
    every job scheduled in this world.
 4. `EntityCommandBuffer.Playback` - any ecb playback will cause a sync point, since all operations that it does are
    executed on main thread. So that means, simply using `EndSimulationEntityCommandBufferSystem` will cause you a sync
    point during that system's update.
+
+SystemAPI calls that cause sync points:
+
+* `SystemAPI.GetSingletonBuffer` - causes a sync RO/RW type sync point, so any job that iterates this buffer or
+  has a lookup for it will be synced.
+* `SystemAPI.Query` - causes a sync point depending on whether you get `RefRO/RW` for each used component type
+
+SystemAPI calls that do not cause sync points:
+
+* `SystemAPI.GetSingleton` and `SystemAPI.GetSingletonRW` - they won't cause a sync point, but they still will
+  throw if there is a job, scheduled that uses those types (either via iteration or via lookup).
 
 There are many more places where sync points happen and it's best to look at source of method to see if it has one.
 But as general rule of thumb - any direct ECS data access on main thread = sync point.

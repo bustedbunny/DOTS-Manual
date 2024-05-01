@@ -68,6 +68,14 @@ meaning they will run in parallel to each other.
 `ReadOnly` and `ReadWrite`which makes things more complicated,
 but allows more jobs to in parallel to each other.*
 
+### Entity Command Buffer System dependency handling
+
+In order to use Entity Command Buffer Systems you are supposed to call
+`SystemAPI.GetSingleton<ECBSystem.Singleton>` which registers dependency on that component type.
+
+ECB System will then just complete RW dependency on that type, which will ensure all jobs that write to
+created `EntityCommandBuffer` will be complete, by the time ECB System is trying to read from it.
+
 ## Sync points
 
 ### What is the sync point?
@@ -187,3 +195,4 @@ Basically it means, after first job scheduling system ran - no sync points shoul
 In reality, by the time next frame starts - all jobs will be finished already, so syncing wouldn't waste any time
 actually waiting for jobs to finish.
 That also means - you may not use any `EntityCommandBufferSystem` except for `BeginSimulationEntityCommandBufferSystem`.
+

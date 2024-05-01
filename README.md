@@ -167,17 +167,21 @@ There are many places where sync points are placed for safety reasons. Here's se
 4. `EntityCommandBuffer.Playback` - any ecb playback will cause a sync point, since all operations that it does are
    executed on main thread. So that means, simply using `EndSimulationEntityCommandBufferSystem` will cause you a sync
    point during that system's update.
+5. `EntityQuery.IsEmpty/CalculateEntityCount` - this causes the sync point, but **only** if there
+are enablable components/change or order filtering specified in the query constraints.
 
-SystemAPI calls that cause sync points:
+Notable API that cause sync points:
 
 * `SystemAPI.GetSingletonBuffer` - causes a sync RO/RW type sync point, so any job that iterates this buffer or
   has a lookup for it will be synced.
 * `SystemAPI.Query` - causes a sync point depending on whether you get `RefRO/RW` for each used component type
 
-SystemAPI calls that do not cause sync points:
+API that do not cause sync points:
 
 * `SystemAPI.GetSingleton` and `SystemAPI.GetSingletonRW` - they won't cause a sync point, but they still will
   throw if there is a job, scheduled that uses those types (either via iteration or via lookup).
+* `EntityQuery.IsEmptyIgnoreFilter/CalculateEntityCountWithoutFiltering` - this will calculate
+entity count but will exclude any filtering, that requires a sync point.
 
 There are many more places where sync points happen and it's best to look at source of method to see if it has one.
 But as general rule of thumb - any direct ECS data access on main thread = sync point.

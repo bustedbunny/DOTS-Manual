@@ -4,6 +4,7 @@
 
 - [System dependencies](#system-dependencies)
 - [Sync points](#sync-points)
+- [API Gotchas](#api-gotchas)
 
 ## System dependencies
 
@@ -196,3 +197,54 @@ In reality, by the time next frame starts - all jobs will be finished already, s
 actually waiting for jobs to finish.
 That also means - you may not use any `EntityCommandBufferSystem` except for `BeginSimulationEntityCommandBufferSystem`.
 
+## API gotchas
+
+Not every API usage as straightforward as it may seem initially.
+Here's the list of API details that should be accounted for how these methods are used:
+
+### `EntityManager.Add/RemoveComponent(EntityQuery)`
+
+The problem with this specific overload comes from the difference of how this command works
+compared to `Entity` overload.
+`EntityQuery` overload instead of moving entity one by one between chunks, modifies chunks themselves
+so they start to match the target archetype after adding/removing component. So that makes it
+extremely efficient on large amounts of entities.
+
+But at the same time it introduces a problem of "empty" chunks, that appears when this method being
+frequently used on little amounts of entities.
+
+For example: let's say we have 1 entity that matches the `EntityQuery` passed to
+this method. So we modified chunk and it matches the target archetype.
+
+Now later we again have entity of same archetype passed to same method and the same thing
+happens: we modify source entity's chunk to make it match the target archetype.
+
+And here's the problem: we have 2 chunks with just 1 entity inside in both (for reference, max
+amount of entities in chunk is 128). If same behaviour will keep going - memory usage will be very
+inefficient while performance of iteration is very poor.
+
+So this detail should be considered very carefully depending on the context of logic.
+Cases when this method is appropriate:
+
+* One time operation of post-processing subscene
+
+Cases when this method is not appropriate:
+
+* Post-processing entities that get instantiated
+
+### `EntityManager.Instantiate(Entity, NativeArray<Entity>)`
+
+The problem with this method comes from the difference with normal `Entity` overload of `Instantiate`.
+The normal method would instantiate whole `LinkedEntityGroup` of entities that are stored on
+entity prefab. Meanwhile `NativeArray` overload would not.
+
+So for example if you have your character entity baked with a bunch of child entities - they won't
+be instantiated with this method.
+
+Cases when this method is appropriate:
+
+* When you know for sure, that archetype of entity does not contain `LinkedEntityGroup`
+
+Cases when this method is not appropriate:
+
+* Prefabs with unknown archetype (for example coming from baking)

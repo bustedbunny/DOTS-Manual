@@ -2,10 +2,20 @@
 
 ## Table of contents
 
+- [Manual requirements](#manual-requirements)
 - [Unity Jobs safety system](#unity-jobs-safety-system)
 - [System dependencies](#system-dependencies)
 - [Sync points](#sync-points)
 - [API Gotchas](#api-gotchas)
+
+### Manual requirements
+
+This manual is about advanced parts of Unity DOTS usage and assumes you have already read the
+following manuals:
+
+* [Unity Job system manual](https://docs.unity3d.com/Manual/JobSystem.html)
+* [Unity.Entities manual](https://docs.unity3d.com/Packages/com.unity.entities@1.2/manual/index.html)
+* [Unity.Burst manual](https://docs.unity3d.com/Packages/com.unity.burst@1.8/manual/index.html)
 
 ## Unity Jobs safety system
 

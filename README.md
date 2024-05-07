@@ -61,6 +61,9 @@ In order to avoid exceptions shown in previous section you need to use job depen
 
 Using this behaviour you must ensure that no two jobs can ever cause a race condition.
 
+_This behaviour is already implemented by Unity ECS. Read more in
+[system dependencies section](#system-dependencies)._
+
 ### Safety during Native Container usage
 
 Aside from scheduling safety, native containers also implement safety on every usage, by calling

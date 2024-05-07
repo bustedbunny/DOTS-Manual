@@ -16,6 +16,8 @@ validated in editor time deterministically.
 
 <img alt="image" height="256" src="https://github.com/bustedbunny/DOTS-Manual/assets/30902981/6110ba94-7caa-4eaa-945d-2eb517a3d3c6" width="512"/>
 
+_Race condition example: thread A and thread B try to append the same variable._
+
 ### Native container
 
 Jobs may only be scheduled only if they are fully `unmanaged`, meaning you can't have any managed objects inside.

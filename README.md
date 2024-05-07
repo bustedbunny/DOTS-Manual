@@ -38,6 +38,10 @@ handles are being used by other jobs in unsafe way:
 Only fields that have `Unity.Collections.ReadOnly` attribute are considered as read-only.
 ```
 
+```
+"Reserved" state gets released only when 'JobHandle.Complete()' also known as sync point will be called.
+```
+
 Whenever any unsafe behaviour is found Unity will throw an exception that would look like example below and job
 will not be scheduled:
 

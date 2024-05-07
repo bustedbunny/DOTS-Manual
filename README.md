@@ -20,8 +20,8 @@ _Race condition example: thread A and thread B try to append the same variable._
 
 ### Native container
 
-Jobs may only be scheduled only if they are fully `unmanaged`, meaning you can't have any managed objects inside.
-In order to obtain data back from job you are supposed to use native
+Jobs may only be scheduled only if they are fully `unmanaged`, meaning you can't have any managed objects like List or
+[] arrays inside. In order to obtain data back from job you are supposed to use native
 containers: `NativeArray`, `NativeList`, `NativeQueue` etc.
 
 Only native containers implement safety for Unity Job system and any custom types that implement

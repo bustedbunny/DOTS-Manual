@@ -45,11 +45,9 @@ Only fields that have `Unity.Collections.ReadOnly` attribute are considered as r
 Whenever any unsafe behaviour is found Unity will throw an exception that would look like example below and job
 will not be scheduled:
 
-```
-InvalidOperationException: The previously scheduled job `JobType` writes to the `NativeContainerType`
+_InvalidOperationException: The previously scheduled job `JobType` writes to the `NativeContainerType`
 `NativeContainerName`. You must call `JobHandle.Complete()` on the job `JobType`, before you can write
-to the `NativeContainerType`safely.
-```
+to the `NativeContainerType`safely._
 
 ### Avoiding race conditions
 

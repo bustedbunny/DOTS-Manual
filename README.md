@@ -390,3 +390,34 @@ Here's the general steps that happen in Builds (or play mode if we assume all Su
    object scene)
 3. It locates existing subscene binary asset and asynchronously loads it and then deserializes entities into world
 4. When complete - clone of baked SubScene appears into world
+
+### Content management and content archives
+
+Similar to asset bundles or Addressables - baking has its own implementation of content archives.
+
+Content management does not expose manual content archive configuration and instead automatically generates
+all of it during build process:
+
+1. After build starts all included game object scenes are scanned for `SubScene` MonoBehaviour and referenced
+   scene inside of it is added to a special list.
+2. Additionally, build goes over all implementations
+   of [IEntitySceneBuildAdditions](https://docs.unity3d.com/Packages/com.unity.entities@1.3/api/Unity.Scenes.Editor.IEntitySceneBuildAdditions.html)
+   and adds what it returns to same list
+3. Next build is baking all scenes of that list
+4. Once baking is done - all resulting SubScenes are scanned for all weak references they include (
+   `EntitySceneReference` or `EntityPrefabReference`) and they get also added to list
+5. Process goes back to step 3 (but excluding baking already baked SubScenes) until no new weak references are detected
+6. Once all SubScenes are baked - build generates a layout of content
+   archives
+
+Generated layout of content archives ensures that:
+
+1. SubScene only loads assets that it's dependent on
+2. Assets are grouped as much as possible, while preserving rule 1
+
+For example: if you have two SubScenes. First references meshes A, B and C. Second references meshes C, D and E.
+Three total content archives will be generated:
+
+1. Archive with meshes A and B, referenced by first SubScene.
+2. Archive with mesh C, referenced by both SubScenes.
+3. Archive with meshes D and E, referenced by second SubScene.

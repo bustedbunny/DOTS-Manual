@@ -336,3 +336,57 @@ Cases when this method is appropriate:
 Cases when this method is not appropriate:
 
 * Prefabs with unknown archetype (for example coming from baking)
+
+## Baking explained
+
+### What is baking?
+
+Baking - which may be referred as "Conversion workflow" in some context is a process of converting `GameObject`
+into binary file, which contains entity data.
+
+Key facts about baking:
+
+* Baking is editor-only process which runs in special worker unity instances
+* Baking may run in main editor instance for live baking (which makes it the easiest way to debug baking code)
+* By default, baking is invoked by either built-in subscene loading system, live-baking when user opens
+  (checkbox in hierarchy window) subscene or during build process
+* Subscene streaming (loading of subscene via built in systems) is the only way that matches how build behaves
+* Subscene streaming requires at least 1 frame to fully load subscene and it cannot be done synchronously
+* Live-baking pre-bakes entities as soon as checkbox is checked and entities will be injected into worlds even
+  before systems are created
+* Without custom code live-baking behaviour cannot be reproduced in builds
+* Both: game object scenes and game object prefabs may be baked
+
+Baking does not happen every time, but instead it only triggered when either SubScene was never baked or
+when any changes to it's baked dependencies are detected, which include:
+
+* scene or prefab itself (and all underlying nested prefabs in hierarchy)
+* assemblies with baking code or components code
+* any asset on which `IBaker.DependsOn(UnityEngine.Object)` was called during baking
+
+So for example if you call `EditorUtility.SetDirty` and then `AssetDatabase.SaveAssetIfDirty` on any dependent
+asset - that would trigger SubScene rebake, next time it's loading requested (or if it's already loaded as part of
+Editor World for example)
+
+Here's the general steps that happen in Editor regarding baking:
+
+1. User opens project for the first time or makes code change that triggers domain reload and dirties SubScenes
+2. Editor world attempts to load SubScenes included in normal scene which have `Auto Load` checkbox on
+3. Since all SubScene data is invalidated - streaming system invokes a `SubsceneImporter` process in
+   separate worker Unity Editor instance
+4. This `SubsceneImporer` creates baking world, runs all built-in and user baking code
+5. Once baking is complete, special binary asset is created with all entities data
+6. When special binary asset is available - streaming system asynchronously loads it and
+   then deserializes entities into world
+7. When complete - clone of baked SubScene appears into world
+
+If you attempt to enter play mode afterward - streaming system will not trigger any baking and instead will
+just load existing SubScene binary.
+
+Here's the general steps that happen in Builds (or play mode if we assume all SubScenes are pre-baked):
+
+1. Play mode starts and default World starts it's update loop
+2. Streaming system starts to load all requested SubScenes (usually triggered by `SubScene` MonoBehaviour in loaded game
+   object scene)
+3. It locates existing subscene binary asset and asynchronously loads it and then deserializes entities into world
+4. When complete - clone of baked SubScene appears into world

@@ -7,6 +7,7 @@
 - [System dependencies](#system-dependencies)
 - [Sync points](#sync-points)
 - [API Gotchas](#api-gotchas)
+- [Baking explained](#baking-explained)
 
 ### Manual requirements
 
